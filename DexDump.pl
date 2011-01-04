@@ -4,14 +4,22 @@ use diagnostics;
 use DumpLib;
 use Getopt::Std;
 
+our %opts;
+getopts('as',\%opts);
+
 if (@ARGV == 0) {&usage};
 open my $tempfh,"$ARGV[0]";
 
+
+	
 our $dex = DumpLib->new($tempfh,\%opts);
 
 &init;
 &DumpHdr;
-#&DumpStrings;
+if ($opts{a} || $opts{s})
+{
+	&DumpStrings;
+}
 #&DumpMethods;
 
 
