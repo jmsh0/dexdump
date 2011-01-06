@@ -54,6 +54,7 @@ sub init
 	$dex->{DataIdentifiersOffset} = 	$dex->get_long(0x6c);
 	
 	&GetStrings;
+	&GetPrototypes;
 }
 
 sub DumpHdr
@@ -97,6 +98,20 @@ sub GetStrings
 	}
 	
 		$dex->{StringIDs} = [@strings];	
+}
+
+sub GetPrototypes
+{
+	my $offset = $dex->{PrototypeIdentifiersOffset};
+	
+	my @prototypes;
+
+	for(my $n = 0; $n < $dex->{PrototypeIdentifiersCount}; $n++, $offset += 12)	
+	{
+		$prototypes[$n] = [$dex->get_long($offset),$dex->get_long($offset+4),$dex->get_long($offset+8)];
+	}
+
+	$dex->{PrototypeIDs} = [@prototypes];	
 }
 
 
@@ -153,30 +168,11 @@ sub DumpMethods
 	print "=========Methods=================\n";
 	for(my $n = 0; $n < $dex->{MethodIdentifiersCount}; $n++)	
 	{
-
-#		my $ClassOffset = $dex->get_word($offset) * 4; $offset += 2;
+		printf "Method %#08x:\n", $n; 
+		printf "\tClass\t%s\n", GetClassID(\$offset);	
 		
-#		$ClassOffset += $dex->{TypeIdentifiersOffset};
-				
-#				printf "Class Offset:\t%x\n", $dex->get_long($ClassOffset);
-				printf "Method %#08x:\n", $n; 
-				printf "\tClass\t%s\n", GetClassID(\$offset);
-
-		my $PrototypeOffset = $dex->get_word($offset) * 4; $offset += 2;
-		my $NameOffset = $dex->get_long($offset) * 4; $offset += 4;
-		$PrototypeOffset += $dex->{PrototypeIdentifiersOffset};
-		$NameOffset += $dex->{StringIdentifiersOffset};
-
-				printf "\tPrototype\t%s\n", $dex->{StringIDs}[$dex->get_long($PrototypeOffset)];
-				printf "\tName\t%s\n", $dex->{StringIDs}[$dex->get_long($NameOffset)];
-				if ($n == 4) {exit;}
-				
-				
-#				method_ids_off		0x00d3f0						offset from the start of the file to the method identifiers lis
-#					->class_idx		0x6	+	TypeIdentifiersOffset	index into the type_ids list for the definer of this method.
-#					->descriptor_idx	index into the string_ids list for the descriptor string of this type.
-					
-		
+		printf "\tPrototype\t%s\n", $dex->{StringIDs}[$dex->{PrototypeIDs}[$dex->get_word($offset)][0]];$offset += 2;
+		printf "\tName\t%s\n", $dex->{StringIDs}[$dex->get_long($offset)]; $offset += 4;
 	}
 }
 
