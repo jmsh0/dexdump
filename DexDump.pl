@@ -1,11 +1,11 @@
 #!/usr/bin/perl
 
-use diagnostics;
+#use diagnostics;
 use DumpLib;
 use Getopt::Std;
 
 our %opts;
-getopts('as',\%opts);
+getopts('asm',\%opts);
 
 if (@ARGV == 0) {&usage};
 open my $tempfh,"$ARGV[0]";
@@ -20,8 +20,10 @@ if ($opts{a} || $opts{s})
 {
 	&DumpStrings;
 }
-#&DumpMethods;
-
+if ($opts{a} || $opts{m})
+{
+	&DumpMethods;
+}
 
 sub init
 {
@@ -50,6 +52,8 @@ sub init
 	$dex->{ClassIdentifiersOffset} = 	$dex->get_long(0x64);
 	$dex->{DataIdentifiersCount} =  	$dex->get_long(0x68);
 	$dex->{DataIdentifiersOffset} = 	$dex->get_long(0x6c);
+	
+	&GetStrings;
 }
 
 sub DumpHdr
@@ -82,16 +86,61 @@ sub DumpHdr
 	
 }
 
-
-sub DumpStrings
+sub GetStrings
 {
-	
 	my $offset = $dex->{StringIdentifiersOffset};
+	my @strings;
 	
 	for(my $n = 0; $n < $dex->{StringIdentifiersCount}; $n++, $offset += 4)	
 	{
-		printf "%d:\t%s\n", $n,$dex->get_stringL($dex->get_long($offset));
+		$strings[$n] = 	$dex->get_stringL($dex->get_long($offset));
 	}
+	
+		$dex->{StringIDs} = [@strings];	
+}
+
+
+sub GetClassID
+{
+	my $offset = shift;
+	
+	my $ClassOffset = $dex->get_word($$offset) * 4; 
+	
+	$ClassOffset += $dex->{TypeIdentifiersOffset};
+	
+	$$offset += 2;
+	
+	return $dex->{StringIDs}[$dex->get_long($ClassOffset)];
+}
+
+sub GetPrototypeID
+{
+	my $offset = shift;
+	
+		my $PrototypeOffset = $dex->get_word($offset) * 4; 
+		
+		$PrototypeOffset += $dex->{PrototypeIdentifiersOffset};
+	
+		
+	
+		$$offset += 2;
+	
+	return $dex->{StringIDs}[$dex->get_long($PrototypeOffset)]
+	
+}
+
+
+
+
+
+sub DumpStrings
+{
+	for(my $n = 0; $n < $dex->{StringIdentifiersCount}; $n++)
+	{
+		printf "%x:\t%s\n", $n, $dex->{StringIDs}[$n];
+		
+	}
+	
 }
 
 
@@ -101,16 +150,33 @@ sub DumpMethods
 	
 	my $offset = $dex->{MethodIdentifiersOffset};
 	
+	print "=========Methods=================\n";
 	for(my $n = 0; $n < $dex->{MethodIdentifiersCount}; $n++)	
 	{
-		printf "%d:\t%s\n", $n,$dex->get_stringL($dex->get_long($offset));
-#		class_idx 	ushort 	index into the type_ids list for the definer of this method. This must be a class or array type, and not a primitive type.
-#proto_idx 	ushort 	index into the proto_ids list for the prototype of this method
-#name_idx
-		$dex->get_word(); # class_idx
-		$dex->get_word(); #proto_idx
-		$dex->get_long();#name_idx
-		$offset += 4;
+
+#		my $ClassOffset = $dex->get_word($offset) * 4; $offset += 2;
+		
+#		$ClassOffset += $dex->{TypeIdentifiersOffset};
+				
+#				printf "Class Offset:\t%x\n", $dex->get_long($ClassOffset);
+				printf "Method %#08x:\n", $n; 
+				printf "\tClass\t%s\n", GetClassID(\$offset);
+
+		my $PrototypeOffset = $dex->get_word($offset) * 4; $offset += 2;
+		my $NameOffset = $dex->get_long($offset) * 4; $offset += 4;
+		$PrototypeOffset += $dex->{PrototypeIdentifiersOffset};
+		$NameOffset += $dex->{StringIdentifiersOffset};
+
+				printf "\tPrototype\t%s\n", $dex->{StringIDs}[$dex->get_long($PrototypeOffset)];
+				printf "\tName\t%s\n", $dex->{StringIDs}[$dex->get_long($NameOffset)];
+				if ($n == 4) {exit;}
+				
+				
+#				method_ids_off		0x00d3f0						offset from the start of the file to the method identifiers lis
+#					->class_idx		0x6	+	TypeIdentifiersOffset	index into the type_ids list for the definer of this method.
+#					->descriptor_idx	index into the string_ids list for the descriptor string of this type.
+					
+		
 	}
 }
 
