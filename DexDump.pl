@@ -5,7 +5,7 @@ use DumpLib;
 use Getopt::Std;
 
 our %opts;
-getopts('asm',\%opts);
+getopts('asmc',\%opts);
 
 if (@ARGV == 0) {&usage};
 open my $tempfh,"$ARGV[0]";
@@ -24,6 +24,11 @@ if ($opts{a} || $opts{m})
 {
 	&DumpMethods;
 }
+if ($opts{a} || $opts{c})
+{
+	&DumpClass;
+}
+
 
 sub init
 {
@@ -31,30 +36,51 @@ sub init
 	$dex->{Magic} =~ s/\n/ /; $dex->{Magic} = $dex->{Magic} . "\n";
 	
 	$dex->{Checksum} =                  $dex->get_long(0x8);
+
 	$dex->{Signature} =                	$dex->get_chunk(0xC, 20);
 	
+
 	$dex->{FileSize}  =     	        $dex->get_long(0x20);
+
 	$dex->{HdrLength} =                 $dex->get_long(0x24);
+
 	$dex->{LinkSectionSize} =           $dex->get_long(0x2C);
+
 	$dex->{LinkSectionOff} =           	$dex->get_long(0x30);
+
 	$dex->{MapSectionOff} =           	$dex->get_long(0x34);
+
 	$dex->{StringIdentifiersCount} =    $dex->get_long(0x38);
+
 	$dex->{StringIdentifiersOffset} =   $dex->get_long(0x3C);
+
 	$dex->{TypeIdentifiersCount} =    	$dex->get_long(0x40);
+
 	$dex->{TypeIdentifiersOffset} =   	$dex->get_long(0x44);
+
 	$dex->{PrototypeIdentifiersCount} =  $dex->get_long(0x48);
+
 	$dex->{PrototypeIdentifiersOffset} = $dex->get_long(0x4C);
+
 	$dex->{FieldIdentifiersCount} =		$dex->get_long(0x50);
+
 	$dex->{FieldIdentifiersOffset} = 	$dex->get_long(0x54);
+
 	$dex->{MethodIdentifiersCount} =  	$dex->get_long(0x58);
+
 	$dex->{MethodIdentifiersOffset} = 	$dex->get_long(0x5c);
+
 	$dex->{ClassIdentifiersCount} =  	$dex->get_long(0x60);
+
 	$dex->{ClassIdentifiersOffset} = 	$dex->get_long(0x64);
+
 	$dex->{DataIdentifiersCount} =  	$dex->get_long(0x68);
+
 	$dex->{DataIdentifiersOffset} = 	$dex->get_long(0x6c);
 	
 	&GetStrings;
 	&GetPrototypes;
+
 }
 
 sub DumpHdr
@@ -115,38 +141,38 @@ sub GetPrototypes
 }
 
 
+
+
 sub GetClassID
 {
-	my $offset = shift;
+	my $index = shift;
 	
-	my $ClassOffset = $dex->get_word($$offset) * 4; 
+	my $ClassOffset = $index * 4; 
 	
 	$ClassOffset += $dex->{TypeIdentifiersOffset};
-	
-	$$offset += 2;
 	
 	return $dex->{StringIDs}[$dex->get_long($ClassOffset)];
 }
 
-sub GetPrototypeID
+
+
+sub ProtToType
 {
-	my $offset = shift;
+	my $proto = shift;
 	
-		my $PrototypeOffset = $dex->get_word($offset) * 4; 
-		
-		$PrototypeOffset += $dex->{PrototypeIdentifiersOffset};
+	$proto =~ s/V/void /g;
+	$proto =~ s/Z/boolean /g;
+	$proto =~ s/B/byte /g;
+	$proto =~ s/S/short /g;
+	$proto =~ s/C/char /g;
+	$proto =~ s/I/int /g;
+	$proto =~ s/J/long /g;
+	$proto =~ s/F/float /g;
+	$proto =~ s/D/double /g;
 	
-		
-	
-		$$offset += 2;
-	
-	return $dex->{StringIDs}[$dex->get_long($PrototypeOffset)]
+	return $proto;
 	
 }
-
-
-
-
 
 sub DumpStrings
 {
@@ -162,21 +188,44 @@ sub DumpStrings
 
 sub DumpMethods
 {
-	
 	my $offset = $dex->{MethodIdentifiersOffset};
 	
 	print "=========Methods=================\n";
 	for(my $n = 0; $n < $dex->{MethodIdentifiersCount}; $n++)	
 	{
 		printf "Method %#08x:\n", $n; 
-		printf "\tClass\t%s\n", GetClassID(\$offset);	
+		printf "\tClass\t\t%s\n", GetClassID($dex->get_word($offset));	
+                $offset += 2;		
+#								PrototypeID[index][0] == shortydescriptor
+		printf "\tPrototype\t%s\n", ProtToType($dex->{StringIDs}[$dex->{PrototypeIDs}[$dex->get_word($offset)][0]]);
+		$offset += 2;
 		
-		printf "\tPrototype\t%s\n", $dex->{StringIDs}[$dex->{PrototypeIDs}[$dex->get_word($offset)][0]];$offset += 2;
-		printf "\tName\t%s\n", $dex->{StringIDs}[$dex->get_long($offset)]; $offset += 4;
+		printf "\tName\t\t%s\n", $dex->{StringIDs}[$dex->get_long($offset)]; $offset += 4;
 	}
 }
 
+sub DumpClass
+{
+	my $offset = $dex->{ClassIdentifiersOffset};
 
+	print "=========Classes=================\n";
+	for(my $n = 0; $n < $dex->{ClassIdentifiersCount}; $n++)	
+	{
+                printf "\tClass\t\t%s\n", GetClassID($dex->get_long($offset));
+                $offset += 4;
+		$offset += 4;
+		$offset += 4;
+		$offset += 4;
+		$offset += 4;
+		$offset += 4;
+		$offset += 4;
+		$offset += 4;
+	
+        }
+
+
+
+}
 
 
 
