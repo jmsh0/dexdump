@@ -5,7 +5,7 @@ use DumpLib;
 use Getopt::Std;
 
 our %opts;
-getopts('asmc',\%opts);
+getopts('asmcf',\%opts);
 
 if (@ARGV == 0) {&usage};
 open my $tempfh,"$ARGV[0]" or die "Unable to open $ARGV[0]\n";
@@ -28,7 +28,10 @@ if ($opts{a} || $opts{c})
 {
 	&GetClasses;
 }
-
+if ($opts{a} || $opts{f})
+{
+	&DumpFieldIDs;
+}
 
 sub init
 {
@@ -57,9 +60,10 @@ sub init
 	$dex->{DataIdentifiersOffset} = 	$dex->get_long(0x6c);
 	
 	&initAccessFlags;
+	&initVisibilityFlags;
 	&GetStrings;
+	&GetFieldIDs;
 	&GetPrototypes;
-
 }
 
 sub DumpHdr
@@ -87,7 +91,7 @@ sub DumpHdr
 	printf "Class IDs Offset => %#08x\n", $dex->{ClassIdentifiersOffset}; 
 	printf "Data IDs Count  => %#08x\n", $dex->{DataIdentifiersCount};  
 	printf "Data IDs Offset => %#08x\n", $dex->{DataIdentifiersOffset}; 
-	
+	print "--------------------------------------------\n";
 	
 	
 }
@@ -102,7 +106,24 @@ sub GetStrings
 		$strings[$n] = 	$dex->get_stringL($dex->get_long($offset));
 	}
 	
-		$dex->{StringIDs} = [@strings];	
+	$dex->{StringIDs} = [@strings];	
+}
+
+sub GetFieldIDs
+{
+	
+	my $offset = $dex->{FieldIdentifiersOffset};
+	my @fields;
+	
+	for(my $n = 0; $n < $dex->{FieldIdentifiersCount}; $n++, $offset += 8)	
+	{
+		
+		
+		$fields[$n] = 	[GetClassID($dex->get_word($offset)), GetClassID($dex->get_word($offset+2)), $dex->{StringIDs}[$dex->get_long($offset+4)]]
+	}
+	
+	$dex->{FieldIDs} = [@fields];	
+		
 }
 
 sub GetPrototypes
@@ -162,17 +183,37 @@ sub initAccessFlags
 	$dex->{AccessFlags} = {%accFlags};
 }
 
+sub initVisibilityFlags
+{
+		my %visFlags;
+		$visFlags{Build} = 0x0;
+		$visFlags{Runtime} = 0x1;
+		$visFlags{System} = 0x2;
+		
+		$dex->{VisibilityFlags} = {%visFlags};
+}
+
 sub DumpStrings
 {
 	for(my $n = 0; $n < $dex->{StringIdentifiersCount}; $n++)
 	{
-		printf "%x:\t%s\n", $n, $dex->{StringIDs}[$n];
-		
+			printf "%x:\t%s\n", $n, $dex->{StringIDs}[$n];
 	}
 	
 }
 
-
+sub DumpFieldIDs
+{
+	for(my $n = 0; $n < $dex->{FieldIdentifiersCount}; $n++)
+	{
+		printf "FieldID %#04x:\n", $n;
+		printf "\tClass\t\t%s\n", $dex->{FieldIDs}[$n][0];	
+		printf "\tType\t\t%s\n", $dex->{FieldIDs}[$n][1];	
+		printf "\tName\t\t%s\n", $dex->{FieldIDs}[$n][2]; 
+		print "\t--------------------------------------------\n";
+	}
+	
+}
 
 sub DumpMethods
 {
@@ -181,7 +222,7 @@ sub DumpMethods
 	print "=========Methods=================\n";
 	for(my $n = 0; $n < $dex->{MethodIdentifiersCount}; $n++)	
 	{
-		printf "Method %#08x:\n", $n; 
+		printf "Method %#04x:\n", $n; 
 		printf "\tClass\t\t%s\n", GetClassID($dex->get_word($offset));	
                 $offset += 2;		
 #								PrototypeID[index][0] == shortydescriptor
@@ -189,6 +230,7 @@ sub DumpMethods
 		$offset += 2;
 		
 		printf "\tName\t\t%s\n", $dex->{StringIDs}[$dex->get_long($offset)]; $offset += 4;
+		print "\t--------------------------------------------\n";
 	}
 }
 
@@ -199,30 +241,112 @@ sub GetClasses
 	#print "=========Classes=================\n";
 	for(my $n = 0; $n < $dex->{ClassIdentifiersCount}; $n++)	
 	{
-        	my ($classname, $accflags, $superclass, $interfaces, $source, $annotations, $classdata, $staticval);
-	       # printf "\tClass\t\t%s\n", GetClassID($dex->get_long($offset));
+       	my ($classname, $accflags, $superclass, $interfaces, $source, $annotations, $classdata, $staticval);
 		$classname = GetClassID($dex->get_long($offset));
         printf "\tClass\t\t%s\n", $classname;
 		$offset += 4;
 
-
 		$accflags = GetAccFlags($dex->get_long($offset));
         printf "\tAccess Flags: \t%s\n", $accflags;
 		$offset += 4;
+	
+		my $sclassindex = $dex->get_long($offset);
+		if ($sclassindex != 0xFFFFFFFF)
+		{
+			$superclass = GetClassID($sclassindex);
+	        printf "\tSuperclass\t%s\n", $superclass;
+		}
+		$offset += 4;
+		
+		my $ifaceOffset = $dex->get_long($offset);
+		if ($ifaceOffset)
+		{
+			my $ifacelistsize = $dex->get_long($ifaceOffset);
+			$ifaceOffset += 4;
+			
+			for (my $n = 0; $n < $ifacelistsize;$n++)
+			{
+				$interfaces .= "\t\t\t" . GetClassID($dex->get_word($ifaceOffset)) . "\n";
+			}
+			
+			printf "\tInterfaces:\n%s", $interfaces;
+		}	
+		$offset += 4;
 
-	#	superclass_idx
+		$source = $dex->{StringIDs}[$dex->get_long($offset)];
+		printf "\tSource file\t%s\n", $source;
 		$offset += 4;
-	#	interfaces_off
-		$offset += 4;
-	#	source_file_idx
-		$offset += 4;
+
 	#	annotations_off
+		my $annotOffset = $dex->get_long($offset);
+	
+			if ($annotOffset)
+			{
+	#			class_annotations_off 	uint 	offset from the start of the file to the annotations made directly on the class, or 0 if the class has no direct annotations. The offset, if non-zero, should be to a location in the data section. 
+				my $annotSetItemOffset = $dex->get_long($annotOffset);
+				$annotOffset += 4;
+	#			fields_size 	uint 	count of fields annotated by this item
+				my $fieldCount = $dex->get_long($annotOffset);
+				$annotOffset += 4;
+	#			annotated_methods_off 	uint 	count of methods annotated by this item
+				my $methods_size = $dex->get_long($annotOffset);
+				$annotOffset += 4;
+	#			annotated_parameters_off 	uint 	count of method parameter lists annotated by this item
+				my $params_size = $dex->get_long($annotOffset);
+				$annotOffset += 4;
+				if($fieldCount)
+				{
+					for(my $n = 0; $n < $fieldCount;$n++)
+					{
+	#					field_idx 	uint 	index into the field_ids list for the identity of the field being annotated
+						printf "%08#x", $dex->{FieldIDs}[$dex->get_long($annotOffset)][2];
+						$annotOffset += 4;
+	#					annotations_off
+						my $dex->get_long($annotOffset);
+											
+					}
+				}
+				
+				if($methods_size)
+				{
+					for(my $n = 0; $n < $fieldCount;$n++)
+					{
+						
+					}
+					
+				}
+				
+				if($params_size)
+				{
+					for(my $n = 0; $n < $fieldCount;$n++)
+					{
+						
+					}
+					
+				}
+	
+	
+			#field_annotations 	field_annotation[fields_size] (optional) 	list of associated field annotations. The elements of the list must be sorted in increasing order, by field_idx.
+			#method_annotations 	method_annotation[methods_size] (optional) 	list of associated method annotations. The elements of the list must be sorted in increasing order, by method_idx.
+			#parameter_annotations
+						
+			#			for (my $n = 0; $n < $annotlistsize;$n++)
+			#			{
+			#				$annotations .= "\t\t\t" . GetClassID($dex->get_word($annotOffset)) . "\n";
+			#			}
+			#			
+			#			printf "\tAnnotations:\n%s", $annotations;
+			}	
+			else
+			{
+				printf "\tNo Annotations\n";
+			}
 		$offset += 4;
 	#	class_data_off
 		$offset += 4;
 	#	static_values_off
 		$offset += 4;
-
+		print "\t--------------------------------------------\n";
 #	$dex->{Classes} = [];
 	
         }
