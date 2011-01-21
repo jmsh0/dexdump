@@ -5,7 +5,7 @@ use DumpLib;
 use Getopt::Std;
 
 our %opts;
-getopts('asmcf',\%opts);
+getopts('asmcft',\%opts);
 
 if (@ARGV == 0) {&usage};
 open my $tempfh,"$ARGV[0]" or die "Unable to open $ARGV[0]\n";
@@ -32,6 +32,11 @@ if ($opts{a} || $opts{f})
 {
 	&DumpFieldIDs;
 }
+if ($opts{a} || $opts{t})
+{
+	&DumpTypeIDs;
+}
+
 
 sub init
 {
@@ -60,10 +65,11 @@ sub init
 	$dex->{DataIdentifiersOffset} = 	$dex->get_long(0x6c);
 	
 	&initAccessFlags;
-	&initVisibilityFlags;
 	&GetStrings;
-	&GetFieldIDs;
+	&GetTypeIDs;
 	&GetPrototypes;
+	&GetFieldIDs;
+	&GetMethods;
 }
 
 sub DumpHdr
@@ -140,7 +146,33 @@ sub GetPrototypes
 	$dex->{PrototypeIDs} = [@prototypes];	
 }
 
+sub GetTypeIDs
+{
+	my $offset = $dex->{TypeIdentifiersOffset};
+	
+	my @types;
 
+	for(my $n = 0; $n < $dex->{TypeIdentifiersCount}; $n++, $offset += 4)	
+	{
+		$types[$n] = $dex->{StringIDs}[$dex->get_long($offset)];
+	}
+
+	$dex->{TypeIDs} = [@types];	
+}
+
+sub GetMethods
+{
+	my $offset = $dex->{MethodIdentifiersOffset};
+	
+	my @methods;
+
+	for(my $n = 0; $n < $dex->{MethodIdentifiersCount}; $n++, $offset += 8)	
+	{
+		$methods[$n] = [GetClassID($dex->get_word($offset)),ProtToType($dex->{StringIDs}[$dex->{PrototypeIDs}[$dex->get_word($offset+2)][0]]),$dex->{StringIDs}[$dex->get_long($offset+4)]];
+	}
+
+	$dex->{Methods} = [@methods];	
+}
 
 
 sub GetClassID
@@ -183,21 +215,22 @@ sub initAccessFlags
 	$dex->{AccessFlags} = {%accFlags};
 }
 
-sub initVisibilityFlags
-{
-		my %visFlags;
-		$visFlags{Build} = 0x0;
-		$visFlags{Runtime} = 0x1;
-		$visFlags{System} = 0x2;
-		
-		$dex->{VisibilityFlags} = {%visFlags};
-}
+
 
 sub DumpStrings
 {
 	for(my $n = 0; $n < $dex->{StringIdentifiersCount}; $n++)
 	{
 			printf "%x:\t%s\n", $n, $dex->{StringIDs}[$n];
+	}
+	
+}
+
+sub DumpTypeIDs
+{
+	for(my $n = 0; $n < $dex->{TypeIdentifiersCount}; $n++)
+	{
+			printf "%x:\t%s\n", $n, $dex->{TypeIDs}[$n];
 	}
 	
 }
@@ -223,13 +256,10 @@ sub DumpMethods
 	for(my $n = 0; $n < $dex->{MethodIdentifiersCount}; $n++)	
 	{
 		printf "Method %#04x:\n", $n; 
-		printf "\tClass\t\t%s\n", GetClassID($dex->get_word($offset));	
-                $offset += 2;		
-#								PrototypeID[index][0] == shortydescriptor
-		printf "\tPrototype\t%s\n", ProtToType($dex->{StringIDs}[$dex->{PrototypeIDs}[$dex->get_word($offset)][0]]);
-		$offset += 2;
+		printf "\tClass\t\t%s\n", $dex->{Methods}[$n][0];	
+		printf "\tPrototype\t%s\n", $dex->{Methods}[$n][1];
 		
-		printf "\tName\t\t%s\n", $dex->{StringIDs}[$dex->get_long($offset)]; $offset += 4;
+		printf "\tName\t\t%s\n", $dex->{Methods}[$n][2];
 		print "\t--------------------------------------------\n";
 	}
 }
@@ -282,35 +312,50 @@ sub GetClasses
 	
 			if ($annotOffset)
 			{
-	#			class_annotations_off 	uint 	offset from the start of the file to the annotations made directly on the class, or 0 if the class has no direct annotations. The offset, if non-zero, should be to a location in the data section. 
-				my $annotSetItemOffset = $dex->get_long($annotOffset);
+
+				my $annotClassOffset = $dex->get_long($annotOffset);
 				$annotOffset += 4;
-	#			fields_size 	uint 	count of fields annotated by this item
+
 				my $fieldCount = $dex->get_long($annotOffset);
 				$annotOffset += 4;
-	#			annotated_methods_off 	uint 	count of methods annotated by this item
-				my $methods_size = $dex->get_long($annotOffset);
+
+				my $methodsCount = $dex->get_long($annotOffset);
 				$annotOffset += 4;
-	#			annotated_parameters_off 	uint 	count of method parameter lists annotated by this item
-				my $params_size = $dex->get_long($annotOffset);
+
+				my $paramsCount = $dex->get_long($annotOffset);
 				$annotOffset += 4;
+
 				if($fieldCount)
 				{
 					for(my $n = 0; $n < $fieldCount;$n++)
 					{
-	#					field_idx 	uint 	index into the field_ids list for the identity of the field being annotated
 						printf "%08#x", $dex->{FieldIDs}[$dex->get_long($annotOffset)][2];
 						$annotOffset += 4;
-	#					annotations_off
-						my $dex->get_long($annotOffset);
-											
+
+						my $annotSetItemoffset = $dex->get_long($annotOffset);
+						my $annotSetItemSize = $dex->get_long($annotSetItemoffset);
+						for(my $i = 0; $i < $annotSetItemSize; $i++,$annotSetItemoffset += 4)
+						{
+							printf "Visibiity: %s\n", GetVisibilityFlags($dex->get_byte($annotSetItemoffset));$annotSetItemoffset++;
+							printf "Type: %s\n", $dex->{TypeIDs}[$dex->get_uleb128(\$annotSetItemoffset)];
+							my $enc_annot_size = $dex->get_uleb128(\$annotSetItemoffset);
+							   
+							for(my $m = 0;$m < $enc_annot_size; $m++  )
+							{
+								printf "Annotation Name: %s\n",$dex->{StringIDs}[$dex->get_uleb128(\$annotSetItemoffset)];
+							  	
+							}
+						}
 					}
 				}
 				
-				if($methods_size)
+				if($methodsCount)
 				{
-					for(my $n = 0; $n < $fieldCount;$n++)
+					for(my $n = 0; $n < $methodsCount;$n++)
 					{
+						printf "%08#x", $dex->{FieldIDs}[$dex->get_long($annotOffset)][2];
+						$annotOffset += 4;
+						
 						
 					}
 					
@@ -326,16 +371,9 @@ sub GetClasses
 				}
 	
 	
-			#field_annotations 	field_annotation[fields_size] (optional) 	list of associated field annotations. The elements of the list must be sorted in increasing order, by field_idx.
 			#method_annotations 	method_annotation[methods_size] (optional) 	list of associated method annotations. The elements of the list must be sorted in increasing order, by method_idx.
 			#parameter_annotations
 						
-			#			for (my $n = 0; $n < $annotlistsize;$n++)
-			#			{
-			#				$annotations .= "\t\t\t" . GetClassID($dex->get_word($annotOffset)) . "\n";
-			#			}
-			#			
-			#			printf "\tAnnotations:\n%s", $annotations;
 			}	
 			else
 			{
@@ -345,6 +383,7 @@ sub GetClasses
 	#	class_data_off
 		$offset += 4;
 	#	static_values_off
+	
 		$offset += 4;
 		print "\t--------------------------------------------\n";
 #	$dex->{Classes} = [];
@@ -495,3 +534,26 @@ sub GetAccFlags
 	
 }
 
+sub GetVisibilityFlags
+{
+	my $flags = shift;
+	
+	if ($flags == 0x0)
+	{
+		return "Build";	
+	}
+	if ($flags == 0x1)
+	{
+		return "Runtime"
+	}
+	if ($flags == 0x2)
+	{
+		return "System"	
+	}
+}
+
+sub EncodedValues
+{
+	#	TODO
+	
+}
