@@ -1,18 +1,20 @@
 #!/usr/bin/perl
 
 #use diagnostics;
+use FindBin;          
+use lib $FindBin::Bin;
 use DumpLib;
 use Getopt::Std;
 
-our %opts;
-getopts('asmcft',\%opts);
+my %opts;
+getopts('asmcftn',\%opts);
 
 if (@ARGV == 0) {&usage};
 open my $tempfh,"$ARGV[0]" or die "Unable to open $ARGV[0]\n";
 
 
 	
-our $dex = DumpLib->new($tempfh,\%opts);
+my $dex = DumpLib->new($tempfh,\%opts);
 
 &init;
 &DumpHdr;
@@ -258,7 +260,6 @@ sub DumpMethods
 		printf "Method %#04x:\n", $n; 
 		printf "\tClass\t\t%s\n", $dex->{Methods}[$n][0];	
 		printf "\tPrototype\t%s\n", $dex->{Methods}[$n][1];
-		
 		printf "\tName\t\t%s\n", $dex->{Methods}[$n][2];
 		print "\t--------------------------------------------\n";
 	}
@@ -307,10 +308,30 @@ sub GetClasses
 		printf "\tSource file\t%s\n", $source;
 		$offset += 4;
 
-	#	annotations_off
-		my $annotOffset = $dex->get_long($offset);
+	#	TODO: annotations_off
+		if ($opts{a} || $opts{n})
+		{
+			GetAnnots($dex->get_long($offset));
+		}
+		$offset += 4;
+		
+	#	class_data_off
+		$offset += 4;
+	#	static_values_off
 	
-			if ($annotOffset)
+		$offset += 4;
+		print "\t--------------------------------------------\n";
+#	$dex->{Classes} = [];
+# class_data_off->class_data_item->code_item	
+    }
+}
+
+
+
+sub GetAnnots
+{
+	my $annotOffset = shift;
+	if ($annotOffset)
 			{
 
 				my $annotClassOffset = $dex->get_long($annotOffset);
@@ -327,11 +348,66 @@ sub GetClasses
 
 				if($fieldCount)
 				{
+					print "\t--------------------------------------------\n";
+					for(my $n = 0; $n < $fieldCount;$n++)
+					{
+						printf "\tAnnotation\n\t\tField:\t%s\n", $dex->{FieldIDs}[$dex->get_long($annotOffset)][2];
+						$annotOffset += 4;
+
+						my $annotSetItemoffset = $dex->get_long($annotOffset);
+						$annotOffset += 4;
+						my $annotSetItemSize = $dex->get_long($annotSetItemoffset);
+						for(my $i = 0; $i < $annotSetItemSize; $i++,$annotSetItemoffset += 4)
+						{
+							printf "\t\tVisibiity: %s\n", GetVisibilityFlags($dex->get_byte($annotSetItemoffset));$annotSetItemoffset++;
+							printf "\t\tType: %s\n", $dex->{TypeIDs}[$dex->get_uleb128(\$annotSetItemoffset)];
+							my $enc_annot_size = $dex->get_uleb128(\$annotSetItemoffset);
+							   
+							for(my $m = 0;$m < $enc_annot_size; $m++  )
+							{
+								printf "Annotation Name: %s\n",$dex->{StringIDs}[$dex->get_uleb128(\$annotSetItemoffset)];
+							  	
+							}
+						}
+					}
+				}
+				
+				if($methodsCount)
+				{
+					print "\t--------------------------------------------\n";
+					for(my $n = 0; $n < $methodsCount;$n++)
+					{
+						printf "\tAnnotation\n\t\tMethod:\t%s\n", $dex->{Methods}[$dex->get_long($annotOffset)][2];
+						$annotOffset += 4;
+						
+						my $annotSetItemoffset = $dex->get_long($annotOffset);
+						$annotOffset += 4;
+						my $annotSetItemSize = $dex->get_long($annotSetItemoffset);
+#						$annotSetItemoffset += 4;
+						for(my $i = 0; $i < $annotSetItemSize; $i++,$annotSetItemoffset += 4)
+						{
+							printf "\t\tVisibiity: %s\n", GetVisibilityFlags($dex->get_byte($annotSetItemoffset));$annotSetItemoffset++;
+							printf "\t\tType: %s\n", $dex->{TypeIDs}[$dex->get_uleb128(\$annotSetItemoffset)];
+							my $enc_annot_size = $dex->get_uleb128(\$annotSetItemoffset);
+							
+							printf "Annot Meth Enc Annot: %x\n", $annotSetItemoffset;   
+							for(my $m = 0;$m < $enc_annot_size; $m++  )
+							{
+								printf "Annotation Name: %s\n",$dex->{StringIDs}[$dex->get_uleb128(\$annotSetItemoffset)];
+							  	
+							}
+						}
+					}
+				}
+				
+				if($paramsCount)
+				{
+					print "Annot: Params\n----------------\n";
 					for(my $n = 0; $n < $fieldCount;$n++)
 					{
 						printf "%08#x", $dex->{FieldIDs}[$dex->get_long($annotOffset)][2];
 						$annotOffset += 4;
-
+						
 						my $annotSetItemoffset = $dex->get_long($annotOffset);
 						my $annotSetItemSize = $dex->get_long($annotSetItemoffset);
 						for(my $i = 0; $i < $annotSetItemSize; $i++,$annotSetItemoffset += 4)
@@ -348,53 +424,14 @@ sub GetClasses
 						}
 					}
 				}
-				
-				if($methodsCount)
-				{
-					for(my $n = 0; $n < $methodsCount;$n++)
-					{
-						printf "%08#x", $dex->{FieldIDs}[$dex->get_long($annotOffset)][2];
-						$annotOffset += 4;
-						
-						
-					}
-					
-				}
-				
-				if($params_size)
-				{
-					for(my $n = 0; $n < $fieldCount;$n++)
-					{
-						
-					}
-					
-				}
-	
-	
-			#method_annotations 	method_annotation[methods_size] (optional) 	list of associated method annotations. The elements of the list must be sorted in increasing order, by method_idx.
-			#parameter_annotations
-						
 			}	
 			else
 			{
 				printf "\tNo Annotations\n";
 			}
-		$offset += 4;
-	#	class_data_off
-		$offset += 4;
-	#	static_values_off
-	
-		$offset += 4;
-		print "\t--------------------------------------------\n";
-#	$dex->{Classes} = [];
-	
-        }
-
-
-
 }
 
-# class_data_off->class_data_item->code_item
+
 
 # Convenience functions
 
@@ -411,6 +448,7 @@ sub ProtToType
 	$proto =~ s/J/long /g;
 	$proto =~ s/F/float /g;
 	$proto =~ s/D/double /g;
+	$proto =~ s/L/L /g;
 	
 	return $proto;
 	
