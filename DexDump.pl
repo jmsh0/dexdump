@@ -28,7 +28,7 @@ if ($opts{a} || $opts{m})
 }
 if ($opts{a} || $opts{c})
 {
-	&GetClasses;
+	&GetClassDefs;
 }
 if ($opts{a} || $opts{f})
 {
@@ -265,7 +265,7 @@ sub DumpMethods
 	}
 }
 
-sub GetClasses
+sub GetClassDefs
 {
 	my $offset = $dex->{ClassIdentifiersOffset};
 
