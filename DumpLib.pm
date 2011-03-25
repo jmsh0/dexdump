@@ -2,7 +2,7 @@ package DumpLib;
 
 sub new ()
 { 
-  my ($this,$fname,$options) = @_;
+  my ($this,$fname) = @_;
   my $class = ref($this) || $this; 
   my $self = {}; 
   
@@ -56,7 +56,6 @@ sub get_long {
 
 sub get_long_BE {
   my ($self,$offset) = @_;
-  my $offset = shift;
   my $temp;
   sysseek $self->{FH},$offset,0;
   sysread $self->{FH},$temp,4;
