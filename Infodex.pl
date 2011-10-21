@@ -7,6 +7,8 @@ use Getopt::Std;
 my %opts;
 getopts('asmcftn',\%opts);
 
+if (@ARGV == 0) {&usage};
+
 open my $tempfh,"$ARGV[0]" or die "Unable to open $ARGV[0]\n";
 
 my $dex = DumpDex->new($tempfh,\%opts);
@@ -69,6 +71,24 @@ sub DumpHdr
 
 
 
+sub usage {
+die <<END_USAGE
+Infodex - Android DEX File Dumper ver. 0.4
+Copyright 2011 Jimmy Shah  All rights reserved.
 
+Usage: $0 [-asmcft] filename
+
+Options:
+
+    -a  Dump all
+    -s  Dump string table
+    -m  Dump method table
+    -c  Dump class table
+    -f  Dump Fields
+    -t  Display file type information
+
+
+END_USAGE
+}
 
 
