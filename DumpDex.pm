@@ -5,6 +5,7 @@ use FindBin;
 use lib $FindBin::Bin;
 use DumpLib;
 use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
+use File::Temp;
 
 sub new ()
 { 
@@ -35,12 +36,17 @@ sub new ()
 
 	if (@CDex)
 	{
-		unless($CDex[0]->extractToFileNamed("MWclasses.dex") == AZ_OK)
+		my $DexDir = File::Temp->newdir();
+
+		my $ClassesDex = File::Temp->new( TEMPLATE => 'tempXXXXX', DIR =>  $DexDir->dirname, SUFFIX => '.dex');
+    
+		unless($CDex[0]->extractToFileNamed($ClassesDex->filename) == AZ_OK)
 		{
 			croak "Unable to extract classes.dex.\n";
 		}
 		
-		open my $fh,"MWclasses.dex" or croak "Cannot open classes.dex\n";
+		# open tmp classes.dex, pass filehandle to object
+		open my $fh,$ClassesDex->filename or croak "Cannot open classes.dex\n";
 		binmode $fh;
 		
 		$self->{InpF}->{FH} = $fh;
