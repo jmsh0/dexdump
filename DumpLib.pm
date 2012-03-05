@@ -98,17 +98,17 @@ sub get_uleb128
 	my ($self,$offset) = @_;
 	
 	my $temp;
-	my($currByte,$currByteffset);
+	my($currByte,$currByteOffset);
 	
 	while(1) 
 	{
 	  $currByte = $self->get_byte($$offset); $$offset++;
-	  $temp |= (($currByte & 0x7f) << $currByteffset);
+	  $temp |= (($currByte & 0x7f) << $currByteOffset);
 	  if (($currByte >> 7) == 0)
 	  {
 	    last;
 	  }
-	  $currByteffset += 7;
+	  $currByteOffset += 7;
 	}
     
     return $temp;

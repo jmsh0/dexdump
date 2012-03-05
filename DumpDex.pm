@@ -6,6 +6,7 @@ use lib $FindBin::Bin;
 use DumpLib;
 use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
 use File::Temp;
+use Digest::Adler32;
 
 sub new ()
 { 
@@ -627,5 +628,16 @@ sub GetVisibilityFlags
 	}
 }
 
+sub CalcDexFileChecksum
+{
+	my ($self) = shift;
+
+	my $checksumH = Digest::Adler32->new;
+
+	$checksumH->add($self->{InpF}->get_chunk(0xC,$self->{FileSize} - 0xC ));
+
+	return $checksumH->hexdigest;	
+	
+}
 
 1;
