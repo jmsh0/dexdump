@@ -1,4 +1,9 @@
 package DumpDex;
+###############################################################################
+# This program is licensed under the GNU Public License, version 3 or later.
+# A copy of this license is included in the package as License.txt.
+# If it is missing, a copy is available at http://www.gnu.org/copyleft/gpl.html
+###############################################################################
 
 use Carp;
 use FindBin;          
@@ -123,6 +128,8 @@ sub init
 	$self->GetPrototypes;
 	$self->GetFieldIDs;
 	$self->GetMethods;
+	
+	return 1;
 }
 
 sub initAccessFlags
@@ -163,6 +170,7 @@ sub GetStrings
 	for(my $n = 0; $n < $self->{StringIdentifiersCount}; $n++, $offset += 4)	
 	{
 		$strings[$n] = 	$self->{InpF}->get_stringL($self->{InpF}->get_long($offset));
+		printf "%#08x\n", $offset;
 	}
 	
 	$self->{StringIDs} = [@strings];	
@@ -487,7 +495,7 @@ sub ProtToType
 	$proto =~ s/J/long /g;
 	$proto =~ s/F/float /g;
 	$proto =~ s/D/double /g;
-	$proto =~ s/L/L /g;
+	$proto =~ s/L/string /g;
 	
 	return $proto;
 	

@@ -1,4 +1,9 @@
 #!/usr/bin/perl
+###############################################################################
+# This program is licensed under the GNU Public License, version 3 or later.
+# A copy of this license is included in the package as License.txt.
+# If it is missing, a copy is available at http://www.gnu.org/copyleft/gpl.html
+###############################################################################
 use FindBin;          
 use lib $FindBin::Bin;
 use DumpDex;
