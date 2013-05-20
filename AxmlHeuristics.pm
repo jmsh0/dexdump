@@ -83,21 +83,30 @@ sub SuspiciousPermisions
 		return;	
 	}
 	
-	print <<PERM;
----------------------|
-Suspcious Permissions|
----------------------|
-PERM
 	
 	
 	for $i ( 0 .. $#{ $self->{AXML}->{Permissions} } ) 
 	{
 		if ($suspicousPermissions{$self->{AXML}->{Permissions}[$i]} )
 		{
-		  print "$self->{AXML}->{Permissions}[$i]\n";
+		  push @suspPerms,$self->{AXML}->{Permissions}[$i];
 		}
 	}
 
+	if($suspPerms[0])
+	{
+	  print <<PERM;
+---------------------|
+Suspcious Permissions|
+---------------------|
+PERM
+	  
+	  for my $perms (@suspPerms)
+	  {
+	    print "$perms\n";
+	  }
+	  
+	}
 
 }
 
