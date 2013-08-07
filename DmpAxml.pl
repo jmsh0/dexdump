@@ -43,7 +43,7 @@ if ($opts{a} || $opts{d})
 
 if ($opts{h})
 {
-	my $heur = AxmlHeuristics->new($axml);
+	my $heur = AxmlHeuristics->new($axml,$tempfh);
 	$heur->Run;
 }
 
