@@ -162,7 +162,7 @@ sub ProcessChunks
 	  	if (0x001C0001 == $self->{Chunks}[$i][0])
 		{
 # 			print "Strings chunk -" . sprintf "%#08x\n",$self->{Chunks}[$i][0];
-			my @CurrentChunk = shift $self->{Chunks}; #clear strings chunk off chunk array
+			my @CurrentChunk = shift @{$self->{Chunks}}; #clear strings chunk off chunk array
 			$self->ProcessStringsChunk($self->{Offset});
 			$self->{Offset} += $CurrentChunk[0][1];
 			last;
@@ -170,7 +170,7 @@ sub ProcessChunks
 	  	elsif (0x080180 == $self->{Chunks}[$i][0])
 		{
 # 			print "Resource chunk -" . sprintf "%#08x\n",$self->{Chunks}[$i][0];
-			my @CurrentChunk = shift $self->{Chunks}; 
+			my @CurrentChunk = shift @{$self->{Chunks}}; 
 			$self->{ResourceIDs} = $self->ProcessResourceIDChunk($self->{Offset},$CurrentChunk[0][1]);
 			$self->{Offset} += $CurrentChunk[0][1];
 			last;
@@ -266,7 +266,7 @@ sub ProcessEncodedXML
 # 		Start Namespace
 		@namespaces = $self->{Namespaces};
 
-		my @CurrentChunk = shift $self->{Chunks}; 
+		my @CurrentChunk = shift @{$self->{Chunks}}; 
 # 		skip to chunk data/value
 		my $offset = $self->{Offset} + 8;
 		
@@ -290,14 +290,14 @@ sub ProcessEncodedXML
 	      elsif (0x00100101 == $self->{Chunks}[0][0])
  	      {
 # 		"End Namespace"
-		my @CurrentChunk = shift $self->{Chunks}; 
+		my @CurrentChunk = shift @{$self->{Chunks}}; 
 		$self->{Offset} += $CurrentChunk[0][1];
 		last;
 	      }
 	      elsif (0x00100102 == $self->{Chunks}[0][0])
 	      {
 # 		"Start Tag"
-		my @CurrentChunk = shift $self->{Chunks}; 
+		my @CurrentChunk = shift @{$self->{Chunks}}; 
 
 		my $offset = $self->{Offset} + 8;
 
@@ -416,7 +416,7 @@ sub ProcessEncodedXML
 	      elsif (0x00100103 == $self->{Chunks}[0][0])
 	      {
 # 		"End Tag";
-		my @CurrentChunk = shift $self->{Chunks}; 
+		my @CurrentChunk = shift @{$self->{Chunks}}; 
 
 # 		skip to chunk data/value
 		my $offset = $self->{Offset} + 8;
@@ -434,14 +434,14 @@ sub ProcessEncodedXML
 	      elsif (0x00100104 == $self->{Chunks}[0][0])
 	      {
 		$self->{PrintableAXML} .= sprintf "Text -" . sprintf "%#08x\n",$self->{Chunks}[0][0];
-		my @CurrentChunk = shift $self->{Chunks}; 
+		my @CurrentChunk = shift @{$self->{Chunks}}; 
 		$self->{Offset} += $CurrentChunk[0][1];
 		last;
 	      }
 	      else
 	      {
 		$self->{PrintableAXML} .= sprintf "Unknown Tag -" . sprintf "%#08x\n",$self->{Chunks}[0][0];
-		my @CurrentChunk = shift $self->{Chunks}; 
+		my @CurrentChunk = shift @{$self->{Chunks}}; 
 		$self->{Offset} += $CurrentChunk[0][1];
 		$count--;
 		last;
